@@ -23,5 +23,12 @@
     "@web-atoms/web-controls": "^1.1.22",
     "reflect-metadata": "^0.1.13",
     "typescript": "^3.8.3"
-  }
+  },
+  "bundledDependencies": [
+    "@web-atoms/core",
+    "@web-atoms/module-loader",
+    "@web-atoms/web-controls",
+    "reflect-metadata",
+    "typescript"
+  ]
 }
