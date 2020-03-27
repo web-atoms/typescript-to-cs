@@ -1,2 +1,3 @@
-# ts-2-cs
+# TypeScript to C# Code Converter
+
 TypeScript  to C#
