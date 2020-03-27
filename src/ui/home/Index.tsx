@@ -6,7 +6,7 @@ import { AtomGridView } from "@web-atoms/core/dist/web/controls/AtomGridView";
 import IndexViewModel from "./IndexViewModel";
 
 // declare var UMD: any;
-
+// @web-atoms-pack: true
 // UMD.map("typescript/lib/typescript", "/node_modules/typescript/lib/typescript.js", "global", "ts");
 
 export default class Index extends AtomGridView {
