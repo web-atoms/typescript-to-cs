@@ -17,18 +17,19 @@
     "url": "https://github.com/web-atoms/typescript-to-cs/issues"
   },
   "homepage": "https://github.com/web-atoms/typescript-to-cs#readme",
+  "devDependencies": {
+    "typescript": "^3.8.3"
+  },
   "dependencies": {
     "@web-atoms/core": "^1.1.115",
     "@web-atoms/module-loader": "^1.0.408",
     "@web-atoms/web-controls": "^1.1.22",
-    "reflect-metadata": "^0.1.13",
-    "typescript": "^3.8.3"
+    "reflect-metadata": "^0.1.13"
   },
   "bundledDependencies": [
     "@web-atoms/core",
     "@web-atoms/module-loader",
     "@web-atoms/web-controls",
-    "reflect-metadata",
-    "typescript"
+    "reflect-metadata"
   ]
 }
