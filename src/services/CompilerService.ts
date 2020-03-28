@@ -13,10 +13,13 @@ function visitorCTX<T extends ts.Node>(ctx: ts.TransformationContext, tf: printe
         let n = convert(node, tf);
 
         if (n) {
+            if (typeof n === "string") {
+                return ts.createIdentifier(n);
+            }
             if (Array.isArray(n)) {
                 n = n.join("");
+                return ts.createIdentifier(n);
             }
-            return ts.createIdentifier(n);
         }
         // if (n) {
         //     return n;
@@ -56,9 +59,12 @@ function typeName(n: ts.Node | undefined): string {
     return "object";
 }
 
-function toUpperCase(n: ts.Identifier | ts.PrivateIdentifier | undefined): string | ts.Node {
+function toUpperCase(n: string | ts.Identifier | ts.PrivateIdentifier | undefined): string {
     if (!n) { return ""; }
-    return n.text[0].toUpperCase() + n.text.substring(1);
+    if (typeof n !== "string" && n.kind) {
+        n = n.text;
+    }
+    return n[0].toUpperCase() + n.substring(1);
 }
 
 function genericTypes(n: ts.NodeArray<ts.TypeParameterDeclaration> | undefined): string {
@@ -73,7 +79,7 @@ function genericTypes(n: ts.NodeArray<ts.TypeParameterDeclaration> | undefined):
     }).join(",") + ">";
 }
 
-function convert(n: ts.Node, tf: printerFX): string | string [] | undefined {
+function convert(n: ts.Node, tf: printerFX): string | string [] | ts.Node | undefined {
 
     function join(nodes: ts.NodeArray<ts.Node> | undefined, sep: string = ", "): string {
         if (!nodes) { return ""; }
@@ -162,6 +168,21 @@ function convert(n: ts.Node, tf: printerFX): string | string [] | undefined {
         case ts.SyntaxKind.ArrayLiteralExpression:
             const ale = n as ts.ArrayLiteralExpression;
             return literal `new [${ join(ale.elements) }]`;
+        case ts.SyntaxKind.EnumDeclaration:
+            const ed = n as ts.EnumDeclaration;
+            const members = ed.members.map((m) =>
+                m.initializer
+                ? literal `${toUpperCase(m.name as any)} = ${m.initializer}`
+                : literal `${m.name}`).join("\r\n\t");
+            return literal `public enum ${ed.name} { ${members} }`;
+            // return ts.updateEnumDeclaration(
+            //     ed,
+            //     ed.decorators,
+            //     ed.modifiers,
+            //     ed.name,
+            //     ed.members.map((m) => ts.updateEnumMember(
+            //         m,
+            //         ts.createIdentifier(toUpperCase(m.name as any)), m.initializer)));
     }
     return undefined;
 }
