@@ -43,7 +43,7 @@ function typeName(n: ts.Node | undefined): string {
         case ts.SyntaxKind.Identifier:
             return (n as ts.Identifier).text;
         case ts.SyntaxKind.StringKeyword: return "string";
-        case ts.SyntaxKind.NumberKeyword: return "double";
+        case ts.SyntaxKind.NumberKeyword: return "int";
         case ts.SyntaxKind.BooleanKeyword: return "bool";
         case ts.SyntaxKind.ObjectKeyword: return "object";
         case ts.SyntaxKind.TypeReference:
@@ -53,7 +53,7 @@ function typeName(n: ts.Node | undefined): string {
             return typeName(to.type);
         case ts.SyntaxKind.ArrayType:
             const at = n as ts.ArrayTypeNode;
-            return typeName(at.elementType) + "[]";
+            return `List<${typeName(at.elementType)}>`;
         case ts.SyntaxKind.FunctionType:
             const ft = n as ts.FunctionTypeNode;
             return `Func<${ft.parameters.map((p) => typeName(p.type))}, ${typeName(ft.type)}>`;
@@ -162,7 +162,7 @@ function convert(n: ts.Node, tf: printerFX): string | string [] | ts.Node | unde
 
             case ts.SyntaxKind.PropertyDeclaration:
                 const pd = n as ts.PropertyDeclaration;
-                return literal ` ${join(pd.modifiers, " ")} ${typeName(pd.type)} ${pd.name};`;
+                return literal ` ${join(pd.modifiers, " ")} ${typeName(pd.type)} ${toUpperCase(pd.name)};`;
 
             case ts.SyntaxKind.InterfaceDeclaration:
                 const id = n as ts.InterfaceDeclaration;
@@ -216,9 +216,15 @@ function convert(n: ts.Node, tf: printerFX): string | string [] | ts.Node | unde
                         if (ppe.name?.text === "charCodeAt") {
                             return literal `${ppe.expression}[${ce.arguments[0]}]`;
                         }
+                        if (ppe.name?.text === "push") {
+                            return literal `${ppe.expression}.Add(${ce.arguments[0]})`;
+                        }
                     }
                     if (ppe.name?.text === "toLowerCase") {
                         return literal `${ppe.expression}.ToLower()`;
+                    }
+                    if (ppe.name?.text === "pop") {
+                        return literal `${ppe.expression}.RemoveLast()`;
                     }
                 }
                 break;
