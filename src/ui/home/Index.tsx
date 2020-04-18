@@ -18,9 +18,18 @@ export default class Index extends AtomGridView {
         this.viewModel = this.resolve(IndexViewModel);
 
         this.render(<AtomGridView
+            rows="60, *"
             columns="45%, 5, *">
 
+            <header column="0: 3">
+                <input
+                    placeholder="Url"
+                    value={Bind.twoWays(() => this.viewModel.url, ["keyup", "blur", "keydown", "keypress"])}
+                    style="width: 90%"/>
+            </header>
+
             <textarea
+                row="1"
                 column="0"
                 value={Bind.twoWays(() => this.viewModel.source,
                     ["keydown", "keyup", "keypress", "change", "blur", "focus"])}
@@ -28,10 +37,12 @@ export default class Index extends AtomGridView {
                 ></textarea>
 
             <AtomGridSplitter
+                row="1"
                 column="1"
                 />
 
             <textarea
+                row="1"
                 column="2"
                 value={Bind.oneWay(() => this.viewModel.target)}
                 style="width: 100%; height: 100%;"

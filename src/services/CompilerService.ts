@@ -38,6 +38,8 @@ export function transform<T extends ts.Node>(tf: printerFX): ts.TransformerFacto
 function typeName(n: ts.Node | undefined): string {
     if (!n) { return "void"; }
     switch (n.kind) {
+        case ts.SyntaxKind.VoidKeyword:
+            return "void";
         case ts.SyntaxKind.Identifier:
             return (n as ts.Identifier).text;
         case ts.SyntaxKind.StringKeyword: return "string";
@@ -59,7 +61,7 @@ function typeName(n: ts.Node | undefined): string {
     return "object";
 }
 
-function toUpperCase(n: string | ts.Identifier | ts.PrivateIdentifier | undefined): string {
+function toUpperCase(n: any): string {
     if (!n) { return ""; }
     if (typeof n !== "string" && n.kind) {
         n = n.text;
@@ -78,6 +80,8 @@ function genericTypes(n: ts.NodeArray<ts.TypeParameterDeclaration> | undefined):
         return "";
     }).join(",") + ">";
 }
+
+const returnTypeStack: ts.Node[] = [];
 
 function convert(n: ts.Node, tf: printerFX): string | string [] | ts.Node | undefined {
 
@@ -122,67 +126,123 @@ function convert(n: ts.Node, tf: printerFX): string | string [] | ts.Node | unde
         return list.join("");
     }
 
-    switch (n.kind) {
-        case ts.SyntaxKind.VariableStatement:
-            const vd = n as ts.VariableStatement;
-            return vd.declarationList.declarations.map((d) =>
-            d.initializer
-            ? literal `var ${d.name} = ${d.initializer};`
-            : literal`var ${d.name};`);
+    returnTypeStack.push(n);
 
-        case ts.SyntaxKind.FunctionDeclaration:
-            const fd = n as ts.FunctionDeclaration;
-            // tslint:disable-next-line: max-line-length
-            return literal `public static ${typeName(fd.type)} ${toUpperCase(fd.name)}${genericTypes(fd.typeParameters)} (${join(fd.parameters)}) ${fd.body}`;
+    try {
 
-        case ts.SyntaxKind.PropertyAccessExpression:
-            const pae = n as ts.PropertyAccessExpression;
-            return literal `${pae.expression}.${toUpperCase(pae.name)}`;
+        switch (n.kind) {
+            case ts.SyntaxKind.VariableStatement:
+                const vd = n as ts.VariableStatement;
+                return vd.declarationList.declarations.map((d) =>
+                d.initializer
+                ? literal `var ${d.name} = ${d.initializer};`
+                : literal`var ${d.name};`);
 
-        case ts.SyntaxKind.Parameter:
-            const p = n as ts.ParameterDeclaration;
-            return literal `${typeName(p.type)} ${p.name}`;
-        case ts.SyntaxKind.BinaryExpression:
-            const be = n as ts.BinaryExpression;
-            if (be.operatorToken?.kind  === ts.SyntaxKind.EqualsEqualsEqualsToken) {
-                return literal `${be.left} == ${be.right}`;
-            }
-            if (be.operatorToken?.kind  === ts.SyntaxKind.ExclamationEqualsEqualsToken) {
-                return literal `${be.left} != ${be.right}`;
-            }
-            break;
-        case ts.SyntaxKind.CallExpression:
-            const ce = n as ts.CallExpression;
-            if (ce.expression?.kind === ts.SyntaxKind.Identifier) {
-                return literal `${toUpperCase(ce.expression as ts.Identifier)}(${join(ce.arguments)})`;
-            }
-            if (ce.arguments.length === 1) {
+            case ts.SyntaxKind.Constructor:
+                const cc = n as ts.ConstructorDeclaration;
+                const ccd = n.parent as ts.ClassDeclaration || {};
+                return literal `public ${ccd.name}(${join(cc.parameters)}) ${cc.body}`;
+
+            case ts.SyntaxKind.PropertyAssignment:
+                const pa = n as ts.PropertyAssignment;
+                return literal `${pa.name} = ${pa.initializer}`;
+
+            case ts.SyntaxKind.ObjectLiteralExpression:
+                const ole = n as ts.ObjectLiteralExpression;
+                return literal `new { ${join(ole.properties, ",\r\n\t\t" )} }`;
+
+            case ts.SyntaxKind.MethodDeclaration:
+                const md = n as ts.MethodDeclaration;
+                // tslint:disable-next-line: max-line-length
+                return literal `${md.modifiers} ${typeName(md.type)} ${toUpperCase(md.name)} (${join(md.parameters)}) ${md.body}`;
+
+            case ts.SyntaxKind.PropertySignature:
+                const ps = n as ts.PropertySignature;
+                return literal `${typeName(ps.type)} ${ps.name}`;
+
+            case ts.SyntaxKind.PropertyDeclaration:
+                const pd = n as ts.PropertyDeclaration;
+                return literal ` ${join(pd.modifiers, " ")} ${typeName(pd.type)} ${pd.name};`;
+
+            case ts.SyntaxKind.InterfaceDeclaration:
+                const id = n as ts.InterfaceDeclaration;
+                const mList = id.members.map((idm) => literal `public ${idm};`).join("\r\n\t\t");
+                return literal `public class ${typeName(id.name)} {
+                    ${mList}
+                }`;
+
+            case ts.SyntaxKind.ClassDeclaration:
+                const cd = n as ts.ClassDeclaration;
+                for (const iterator of cd.members) {
+                    iterator.parent = n;
+                }
+                return literal `public class ${typeName(cd.name)} {
+                    ${join(cd.members, "\r\n\t\t")}
+                }`;
+
+            case ts.SyntaxKind.FunctionDeclaration:
+                const fd = n as ts.FunctionDeclaration;
+                // tslint:disable-next-line: max-line-length
+                returnTypeStack.push(fd);
+                return literal `public partial class Global {
+                    public static ${typeName(fd.type)} ${toUpperCase(fd.name)} ${genericTypes(fd.typeParameters)
+                        } (${join(fd.parameters)}) ${fd.body}
+                }`;
+
+            case ts.SyntaxKind.PropertyAccessExpression:
+                const pae = n as ts.PropertyAccessExpression;
+                return literal `${pae.expression}.${toUpperCase(pae.name)}`;
+
+            case ts.SyntaxKind.Parameter:
+                const p = n as ts.ParameterDeclaration;
+                return literal `${typeName(p.type)} ${p.name}`;
+            case ts.SyntaxKind.BinaryExpression:
+                const be = n as ts.BinaryExpression;
+                if (be.operatorToken?.kind  === ts.SyntaxKind.EqualsEqualsEqualsToken) {
+                    return literal `${be.left} == ${be.right}`;
+                }
+                if (be.operatorToken?.kind  === ts.SyntaxKind.ExclamationEqualsEqualsToken) {
+                    return literal `${be.left} != ${be.right}`;
+                }
+                break;
+            case ts.SyntaxKind.CallExpression:
+                const ce = n as ts.CallExpression;
+                if (ce.expression?.kind === ts.SyntaxKind.Identifier) {
+                    return literal `${toUpperCase(ce.expression as ts.Identifier)}(${join(ce.arguments)})`;
+                }
                 if (ce.expression?.kind === ts.SyntaxKind.PropertyAccessExpression) {
                     const ppe = ce.expression as ts.PropertyAccessExpression;
-                    if (ppe.name?.text === "charCodeAt") {
-                        return literal `${ppe.expression}[${ce.arguments[0]}]`;
+                    if (ce.arguments.length === 1) {
+                        if (ppe.name?.text === "charCodeAt") {
+                            return literal `${ppe.expression}[${ce.arguments[0]}]`;
+                        }
+                    }
+                    if (ppe.name?.text === "toLowerCase") {
+                        return literal `${ppe.expression}.ToLower()`;
                     }
                 }
-            }
-            break;
-        case ts.SyntaxKind.ArrayLiteralExpression:
-            const ale = n as ts.ArrayLiteralExpression;
-            return literal `new [${ join(ale.elements) }]`;
-        case ts.SyntaxKind.EnumDeclaration:
-            const ed = n as ts.EnumDeclaration;
-            const members = ed.members.map((m) =>
-                m.initializer
-                ? literal `${toUpperCase(m.name as any)} = ${m.initializer}`
-                : literal `${m.name}`).join("\r\n\t");
-            return literal `public enum ${ed.name} { ${members} }`;
-            // return ts.updateEnumDeclaration(
-            //     ed,
-            //     ed.decorators,
-            //     ed.modifiers,
-            //     ed.name,
-            //     ed.members.map((m) => ts.updateEnumMember(
-            //         m,
-            //         ts.createIdentifier(toUpperCase(m.name as any)), m.initializer)));
+                break;
+            case ts.SyntaxKind.ArrayLiteralExpression:
+                const ale = n as ts.ArrayLiteralExpression;
+                return literal `new [${ join(ale.elements) }]`;
+            case ts.SyntaxKind.EnumDeclaration:
+                const ed = n as ts.EnumDeclaration;
+                const members = ed.members.map((m) =>
+                    m.initializer
+                    ? literal `${toUpperCase(m.name as any)} = ${m.initializer}`
+                    : literal `${m.name}`).join("\r\n\t");
+                return literal `public enum ${ed.name} { ${members} }`;
+                // return ts.updateEnumDeclaration(
+                //     ed,
+                //     ed.decorators,
+                //     ed.modifiers,
+                //     ed.name,
+                //     ed.members.map((m) => ts.updateEnumMember(
+                //         m,
+                //         ts.createIdentifier(toUpperCase(m.name as any)), m.initializer)));
+        }
+    } finally {
+        returnTypeStack.pop();
     }
     return undefined;
 }
